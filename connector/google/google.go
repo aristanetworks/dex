@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -44,6 +45,9 @@ type Config struct {
 	// Optional list of whitelisted groups
 	// If this field is nonempty, only users from a listed group will be allowed to log in
 	Groups []string `json:"groups"`
+
+	// Optional field to filter groups by regexp
+	GroupsFilter string `json:"groupsFilter"`
 
 	// Optional path to service account json
 	// If nonempty, and groups claim is made, will use authentication from file to
@@ -118,6 +122,18 @@ func (c *Config) Open(id string, logger *slog.Logger) (conn connector.Connector,
 		promptType = *c.PromptType
 	}
 
+	var groupsFilter *regexp.Regexp
+	if c.GroupsFilter != "" {
+		var err error
+		groupsFilter, err = regexp.Compile(c.GroupsFilter)
+		if err != nil {
+			cancel()
+			return nil, fmt.Errorf("unable to compile the groupsFilter regexp. "+
+				"Input string: %q; error: %v", c.GroupsFilter, err,
+			)
+		}
+	}
+
 	clientID := c.ClientID
 	return &googleConnector{
 		redirectURI: c.RedirectURI,
@@ -135,6 +151,7 @@ func (c *Config) Open(id string, logger *slog.Logger) (conn connector.Connector,
 		cancel:                         cancel,
 		hostedDomains:                  c.HostedDomains,
 		groups:                         c.Groups,
+		groupsFilter:                   groupsFilter,
 		serviceAccountFilePath:         c.ServiceAccountFilePath,
 		domainToAdminEmail:             c.DomainToAdminEmail,
 		fetchTransitiveGroupMembership: c.FetchTransitiveGroupMembership,
@@ -156,6 +173,7 @@ type googleConnector struct {
 	logger                         *slog.Logger
 	hostedDomains                  []string
 	groups                         []string
+	groupsFilter                   *regexp.Regexp
 	serviceAccountFilePath         string
 	domainToAdminEmail             map[string]string
 	fetchTransitiveGroupMembership bool
@@ -317,6 +335,10 @@ func (c *googleConnector) getGroups(email string, fetchTransitiveGroupMembership
 		}
 
 		for _, group := range groupsList.Groups {
+			if c.groupsFilter == nil || c.groupsFilter.MatchString(group.Email) {
+				continue
+			}
+
 			if _, exists := checkedGroups[group.Email]; exists {
 				continue
 			}
