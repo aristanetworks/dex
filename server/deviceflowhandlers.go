@@ -332,7 +332,7 @@ func (s *Server) handleDeviceCallback(w http.ResponseWriter, r *http.Request) {
 			}
 			return
 		}
-		if client.Secret != deviceReq.ClientSecret {
+		if !client.Public && client.Secret != deviceReq.ClientSecret {
 			s.tokenErrHelper(w, errInvalidClient, "Invalid client credentials.", http.StatusUnauthorized)
 			return
 		}
