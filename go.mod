@@ -1,6 +1,6 @@
 module github.com/dexidp/dex
 
-go 1.21
+go 1.21.0
 
 require (
 	cloud.google.com/go/compute/metadata v0.5.0
@@ -16,7 +16,7 @@ require (
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-jose/go-jose/v4 v4.0.4
 	github.com/go-ldap/ldap/v3 v3.4.8
-	github.com/go-sql-driver/mysql v1.8.1
+	github.com/go-sql-driver/mysql v1.9.3
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/handlers v1.5.2
 	github.com/gorilla/mux v1.8.1
