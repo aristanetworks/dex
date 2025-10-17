@@ -158,6 +158,13 @@ func runServe(options serveOptions) error {
 		return fmt.Errorf("failed to register gRPC server metrics: %v", err)
 	}
 
+	var defaultConnectorByClientID map[string]string
+	if filePath := os.Getenv(defaultConnectorsFileEnv); filePath != "" {
+		if defaultConnectorByClientID, err = loadDefaultConnectors(filePath); err != nil {
+			return fmt.Errorf("failed to load client default connectors: %v", err)
+		}
+	}
+
 	var grpcOptions []grpc.ServerOption
 
 	allowedTLSCiphers := []uint16{
@@ -366,15 +373,15 @@ func runServe(options serveOptions) error {
 	}
 
 	serverConfig := server.Config{
-		AllowedGrantTypes:      c.OAuth2.GrantTypes,
-		SupportedResponseTypes: c.OAuth2.ResponseTypes,
-		SkipApprovalScreen:     c.OAuth2.SkipApprovalScreen,
-		AlwaysShowLoginScreen:  c.OAuth2.AlwaysShowLoginScreen,
-		PasswordConnector:      c.OAuth2.PasswordConnector,
-		PKCE: server.PKCEConfig{
-			Enforce:                       c.OAuth2.PKCE.Enforce,
-			CodeChallengeMethodsSupported: c.OAuth2.PKCE.CodeChallengeMethodsSupported,
-		},
+		AllowedGrantTypes:          c.OAuth2.GrantTypes,
+		SupportedResponseTypes:     c.OAuth2.ResponseTypes,
+		SkipApprovalScreen:         c.OAuth2.SkipApprovalScreen,
+		AlwaysShowLoginScreen:      c.OAuth2.AlwaysShowLoginScreen,
+		PasswordConnector:          c.OAuth2.PasswordConnector,
+		PKCE:                       server.PKCEConfig{
+										Enforce:                       c.OAuth2.PKCE.Enforce,
+										CodeChallengeMethodsSupported: c.OAuth2.PKCE.CodeChallengeMethodsSupported,
+									},
 		Headers:                    c.Web.Headers.ToHTTPHeader(),
 		AllowedOrigins:             c.Web.AllowedOrigins,
 		AllowedHeaders:             c.Web.AllowedHeaders,
@@ -390,6 +397,23 @@ func runServe(options serveOptions) error {
 		IDTokensValidFor:           idTokensValidFor,
 		MFAProviders:               buildMFAProviders(c.MFA.Authenticators, c.Issuer, logger),
 		DefaultMFAChain:            c.MFA.DefaultMFAChain,
+		DefaultConnectorByClientID: defaultConnectorByClientID,
+	}
+	if c.Expiry.SigningKeys != "" {
+		signingKeys, err := time.ParseDuration(c.Expiry.SigningKeys)
+		if err != nil {
+			return fmt.Errorf("invalid config value %q for signing keys expiry: %v", c.Expiry.SigningKeys, err)
+		}
+		logger.Info("config signing keys", "expire_after", signingKeys)
+		serverConfig.RotateKeysAfter = signingKeys
+	}
+	if c.Expiry.IDTokens != "" {
+		idTokens, err := time.ParseDuration(c.Expiry.IDTokens)
+		if err != nil {
+			return fmt.Errorf("invalid config value %q for id token expiry: %v", c.Expiry.IDTokens, err)
+		}
+		logger.Info("config id tokens", "valid_for", idTokens)
+		serverConfig.IDTokensValidFor = idTokens
 	}
 
 	if c.Expiry.AuthRequests != "" {
@@ -870,4 +894,14 @@ func buildMFAProviders(authenticators []MFAAuthenticator, issuerURL string, logg
 		}
 	}
 	return providers
+}
+
+func loadDefaultConnectors(filePath string) (map[string]string, error) {
+	fileData, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+	var defaultConnectorByClientID map[string]string
+	err = yaml.Unmarshal(fileData, &defaultConnectorByClientID)
+	return defaultConnectorByClientID, err
 }

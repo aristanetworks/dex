@@ -115,6 +115,8 @@ type Config struct {
 
 	// PKCE configuration
 	PKCE PKCEConfig
+	// Used for specifying a default connector for certain client IDs
+	DefaultConnectorByClientID map[string]string
 
 	GCFrequency time.Duration // Defaults to 5 minutes
 
@@ -225,6 +227,9 @@ type Server struct {
 
 	// Used for password grant
 	passwordConnector string
+
+	// Used for specifying a default connector for certain client IDs
+	defaultConnectorByClientID map[string]string
 
 	supportedResponseTypes map[string]bool
 
@@ -397,25 +402,26 @@ func newServer(ctx context.Context, c Config) (*Server, error) {
 	}
 
 	s := &Server{
-		issuerURL:              *issuerURL,
-		storage:                newKeyCacher(c.Storage, now),
-		supportedResponseTypes: supportedRes,
-		supportedGrantTypes:    supportedGrants,
-		pkce:                   c.PKCE,
-		idTokensValidFor:       value(c.IDTokensValidFor, 24*time.Hour),
-		authRequestsValidFor:   value(c.AuthRequestsValidFor, 24*time.Hour),
-		deviceRequestsValidFor: value(c.DeviceRequestsValidFor, 5*time.Minute),
-		refreshTokenPolicy:     c.RefreshTokenPolicy,
-		skipApproval:           c.SkipApprovalScreen,
-		alwaysShowLogin:        c.AlwaysShowLoginScreen,
-		now:                    now,
-		templates:              tmpls,
-		passwordConnector:      c.PasswordConnector,
-		logger:                 c.Logger,
-		signer:                 c.Signer,
-		sessionConfig:          c.SessionConfig,
-		mfaProviders:           c.MFAProviders,
-		defaultMFAChain:        c.DefaultMFAChain,
+		issuerURL:                  *issuerURL,
+		storage:                    newKeyCacher(c.Storage, now),
+		supportedResponseTypes:     supportedRes,
+		supportedGrantTypes:        supportedGrants,
+		pkce:                       c.PKCE,
+		idTokensValidFor:           value(c.IDTokensValidFor, 24*time.Hour),
+		authRequestsValidFor:       value(c.AuthRequestsValidFor, 24*time.Hour),
+		deviceRequestsValidFor:     value(c.DeviceRequestsValidFor, 5*time.Minute),
+		refreshTokenPolicy:         c.RefreshTokenPolicy,
+		skipApproval:               c.SkipApprovalScreen,
+		alwaysShowLogin:            c.AlwaysShowLoginScreen,
+		now:                        now,
+		templates:                  tmpls,
+		passwordConnector:          c.PasswordConnector,
+		logger:                     c.Logger,
+		signer:                     c.Signer,
+		sessionConfig:              c.SessionConfig,
+		mfaProviders:               c.MFAProviders,
+		defaultMFAChain:            c.DefaultMFAChain,
+		defaultConnectorByClientID: c.DefaultConnectorByClientID,
 	}
 	s.issuer = tokens.NewIssuer(s.storage, s.signer, s.issuerURL, s.idTokensValidFor, s.now, s.logger)
 	s.connectors = connectors.NewCache(s.storage, s.resolveConnector)
