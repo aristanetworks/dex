@@ -21,4 +21,10 @@
   </form>
 </div>
 
+{{ if( .UserCode ) }}
+<script>
+  document.querySelector("form[method=''post'']")?.submit();
+</script>
+{{ end }}
+
 {{ template "footer.html" . }}
