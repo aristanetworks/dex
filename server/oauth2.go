@@ -352,7 +352,7 @@ func genSubject(userID string, connID string) (string, error) {
 }
 
 func (s *Server) newIDToken(ctx context.Context, clientID string, claims storage.Claims, scopes []string, nonce, accessToken, code, connID string) (idToken string, expiry time.Time, err error) {
-	keys, err := s.storage.GetKeys()
+	keys, err := s.storage.GetKeys(ctx)
 	if err != nil {
 		s.logger.ErrorContext(ctx, "failed to get keys", "err", err)
 		return "", expiry, err
@@ -454,6 +454,7 @@ func (s *Server) newIDToken(ctx context.Context, clientID string, claims storage
 
 // parse the initial request from the OAuth2 client.
 func (s *Server) parseAuthorizationRequest(r *http.Request) (*storage.AuthRequest, error) {
+	ctx := r.Context()
 	if err := r.ParseForm(); err != nil {
 		return nil, newDisplayedErr(http.StatusBadRequest, "Failed to parse request.")
 	}
@@ -478,7 +479,7 @@ func (s *Server) parseAuthorizationRequest(r *http.Request) (*storage.AuthReques
 		codeChallengeMethod = codeChallengeMethodPlain
 	}
 
-	client, err := s.storage.GetClient(clientID)
+	client, err := s.storage.GetClient(ctx, clientID)
 	if err != nil {
 		if err == storage.ErrNotFound {
 			return nil, newDisplayedErr(http.StatusNotFound, "Invalid client_id (%q).", clientID)
@@ -500,7 +501,7 @@ func (s *Server) parseAuthorizationRequest(r *http.Request) (*storage.AuthReques
 	}
 
 	if connectorID != "" {
-		connectors, err := s.storage.ListConnectors()
+		connectors, err := s.storage.ListConnectors(ctx)
 		if err != nil {
 			s.logger.ErrorContext(r.Context(), "failed to list connectors", "err", err)
 			return nil, newRedirectedErr(errServerError, "Unable to retrieve connectors")
@@ -635,7 +636,7 @@ func (s *Server) validateCrossClientTrust(ctx context.Context, clientID, peerID 
 	if peerID == clientID {
 		return true, nil
 	}
-	peer, err := s.storage.GetClient(peerID)
+	peer, err := s.storage.GetClient(ctx, peerID)
 	if err != nil {
 		if err != storage.ErrNotFound {
 			s.logger.ErrorContext(ctx, "failed to get client", "err", err)
@@ -669,7 +670,8 @@ func validateRedirectURI(client storage.Client, redirectURI string) bool {
 		return true
 	}
 
-	// verify that the host is of form "http://localhost:(port)(path)" or "http://localhost(path)"
+	// verify that the host is of form "http://localhost:(port)(path)", "http://localhost(path)" or numeric form like
+	// "http://127.0.0.1:(port)(path)"
 	u, err := url.Parse(redirectURI)
 	if err != nil {
 		return false
@@ -677,11 +679,20 @@ func validateRedirectURI(client storage.Client, redirectURI string) bool {
 	if u.Scheme != "http" {
 		return false
 	}
-	if u.Host == "localhost" {
+	return isHostLocal(u.Host)
+}
+
+func isHostLocal(host string) bool {
+	if host == "localhost" || net.ParseIP(host).IsLoopback() {
 		return true
 	}
-	host, _, err := net.SplitHostPort(u.Host)
-	return err == nil && host == "localhost"
+
+	host, _, err := net.SplitHostPort(host)
+	if err != nil {
+		return false
+	}
+
+	return host == "localhost" || net.ParseIP(host).IsLoopback()
 }
 
 func validateConnectorID(connectors []storage.Connector, connectorID string) bool {
@@ -698,7 +709,7 @@ type storageKeySet struct {
 	storage.Storage
 }
 
-func (s *storageKeySet) VerifySignature(_ context.Context, jwt string) (payload []byte, err error) {
+func (s *storageKeySet) VerifySignature(ctx context.Context, jwt string) (payload []byte, err error) {
 	jws, err := jose.ParseSigned(jwt, []jose.SignatureAlgorithm{jose.RS256, jose.RS384, jose.RS512, jose.ES256, jose.ES384, jose.ES512})
 	if err != nil {
 		return nil, err
@@ -710,7 +721,7 @@ func (s *storageKeySet) VerifySignature(_ context.Context, jwt string) (payload 
 		break
 	}
 
-	skeys, err := s.Storage.GetKeys()
+	skeys, err := s.Storage.GetKeys(ctx)
 	if err != nil {
 		return nil, err
 	}

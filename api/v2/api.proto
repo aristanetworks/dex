@@ -16,6 +16,16 @@ message Client {
   string logo_url = 7;
 }
 
+// ClientInfo represents an OAuth2 client without sensitive information.
+message ClientInfo {
+  string id = 1;
+  repeated string redirect_uris = 2;
+  repeated string trusted_peers = 3;
+  bool public = 4;
+  string name = 5;
+  string logo_url = 6;
+}
+
 // GetClientReq is a request to retrieve client details.
 message GetClientReq {
   // The ID of the client.
@@ -61,6 +71,14 @@ message UpdateClientReq {
 // UpdateClientResp returns the response from updating a client.
 message UpdateClientResp {
     bool not_found = 1;
+}
+
+// ListClientReq is a request to enumerate clients.
+message ListClientReq {}
+
+// ListClientResp returns a list of clients.
+message ListClientResp {
+  repeated ClientInfo clients = 1;
 }
 
 // TODO(ericchiang): expand this.
@@ -178,6 +196,28 @@ message VersionResp {
   int32 api = 2;
 }
 
+// DiscoveryReq is a request to fetch discover information.
+message DiscoveryReq {}
+
+//DiscoverResp holds the version oidc disovery info.
+message DiscoveryResp {
+  string issuer = 1;
+  string authorization_endpoint = 2;
+  string token_endpoint = 3;
+  string jwks_uri = 4;
+  string userinfo_endpoint = 5;
+  string device_authorization_endpoint = 6;
+  string introspection_endpoint = 7;
+  repeated string grant_types_supported = 8;
+  repeated string response_types_supported = 9;
+  repeated string subject_types_supported = 10;
+  repeated string id_token_signing_alg_values_supported = 11;
+  repeated string code_challenge_methods_supported = 12;
+  repeated string scopes_supported = 13;
+  repeated string token_endpoint_auth_methods_supported = 14;
+  repeated string claims_supported = 15;
+}
+
 // RefreshTokenRef contains the metadata for a refresh token that is managed by the storage.
 message RefreshTokenRef {
   // ID of the refresh token.
@@ -231,6 +271,8 @@ service Dex {
   rpc UpdateClient(UpdateClientReq) returns (UpdateClientResp) {};
   // DeleteClient deletes the provided client.
   rpc DeleteClient(DeleteClientReq) returns (DeleteClientResp) {};
+  // ListClients lists all client entries.
+  rpc ListClients(ListClientReq) returns (ListClientResp) {};
   // CreatePassword creates a password.
   rpc CreatePassword(CreatePasswordReq) returns (CreatePasswordResp) {};
   // UpdatePassword modifies existing password.
@@ -249,6 +291,8 @@ service Dex {
   rpc ListConnectors(ListConnectorReq) returns (ListConnectorResp) {};
   // GetVersion returns version information of the server.
   rpc GetVersion(VersionReq) returns (VersionResp) {};
+  // GetDiscovery returns discovery information of the server.
+  rpc GetDiscovery(DiscoveryReq) returns (DiscoveryResp) {};
   // ListRefresh lists all the refresh token entries for a particular user.
   rpc ListRefresh(ListRefreshReq) returns (ListRefreshResp) {};
   // RevokeRefresh revokes the refresh token for the provided user-client pair.

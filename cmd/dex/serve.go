@@ -36,6 +36,7 @@ import (
 	"google.golang.org/grpc/reflection"
 
 	"github.com/dexidp/dex/api/v2"
+	"github.com/dexidp/dex/pkg/featureflags"
 	"github.com/dexidp/dex/server"
 	"github.com/dexidp/dex/storage"
 )
@@ -307,6 +308,9 @@ func runServe(options serveOptions) error {
 	if len(c.Web.AllowedOrigins) > 0 {
 		logger.Info("config allowed origins", "origins", c.Web.AllowedOrigins)
 	}
+	if featureflags.ContinueOnConnectorFailure.Enabled() {
+		logger.Info("continue on connector failure feature flag enabled")
+	}
 
 	// explicitly convert to UTC.
 	now := func() time.Time { return time.Now().UTC() }
@@ -329,6 +333,7 @@ func runServe(options serveOptions) error {
 		Now:                        now,
 		PrometheusRegistry:         prometheusRegistry,
 		HealthChecker:              healthChecker,
+		ContinueOnConnectorFailure: featureflags.ContinueOnConnectorFailure.Enabled(),
 		DefaultConnectorByClientID: defaultConnectorByClientID,
 	}
 	if c.Expiry.SigningKeys != "" {
@@ -536,7 +541,7 @@ func runServe(options serveOptions) error {
 		}
 
 		grpcSrv := grpc.NewServer(grpcOptions...)
-		api.RegisterDexServer(grpcSrv, server.NewAPI(serverConfig.Storage, logger, version))
+		api.RegisterDexServer(grpcSrv, server.NewAPI(serverConfig.Storage, logger, version, serv))
 
 		grpcMetrics.InitializeMetrics(grpcSrv)
 		if c.GRPC.Reflection {
