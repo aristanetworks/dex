@@ -4,7 +4,7 @@
   <h2 class="theme-heading">Enter User Code</h2>
   <form method="post" action="{{ .PostURL }}">
     <div class="theme-form-row">
-      {{ if( .UserCode  )}}
+      {{ if .UserCode }}
       <input tabindex="2" required id="user_code" name="user_code" type="text" class="theme-form-input" autocomplete="off" value="{{.UserCode}}" {{ if .Invalid }} autofocus {{ end }}/>
       {{ else }}
       <input tabindex="2" required id="user_code" name="user_code" type="text" class="theme-form-input" placeholder="XXXX-XXXX" autocomplete="off"  {{ if .Invalid }} autofocus {{ end }}/>
@@ -21,7 +21,7 @@
   </form>
 </div>
 
-{{ if( .UserCode ) }}
+{{ if and .UserCode (not .Invalid) }}
 <script>
   document.querySelector("form[method=''post'']")?.submit();
 </script>
