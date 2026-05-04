@@ -51,7 +51,7 @@ func (c *conn) GarbageCollect(now time.Time) (result storage.GCResult, err error
 	var delErr error
 	for _, authRequest := range authRequests {
 		if now.After(authRequest.Expiry) {
-			if err := c.deleteKey(ctx, keyID(authRequestPrefix, authRequest.ID)); err != nil {
+			if err := c.deleteKey(ctx, keyID(authRequestPrefix, authRequest.ID)); err != nil && err != storage.ErrNotFound {
 				c.logger.Error("failed to delete auth request", "err", err)
 				delErr = fmt.Errorf("failed to delete auth request: %v", err)
 			}
@@ -69,7 +69,7 @@ func (c *conn) GarbageCollect(now time.Time) (result storage.GCResult, err error
 
 	for _, authCode := range authCodes {
 		if now.After(authCode.Expiry) {
-			if err := c.deleteKey(ctx, keyID(authCodePrefix, authCode.ID)); err != nil {
+			if err := c.deleteKey(ctx, keyID(authCodePrefix, authCode.ID)); err != nil && err != storage.ErrNotFound {
 				c.logger.Error("failed to delete auth code", "err", err)
 				delErr = fmt.Errorf("failed to delete auth code: %v", err)
 			}
@@ -84,7 +84,7 @@ func (c *conn) GarbageCollect(now time.Time) (result storage.GCResult, err error
 
 	for _, deviceRequest := range deviceRequests {
 		if now.After(deviceRequest.Expiry) {
-			if err := c.deleteKey(ctx, keyID(deviceRequestPrefix, deviceRequest.UserCode)); err != nil {
+			if err := c.deleteKey(ctx, keyID(deviceRequestPrefix, deviceRequest.UserCode)); err != nil && err != storage.ErrNotFound {
 				c.logger.Error("failed to delete device request", "err", err)
 				delErr = fmt.Errorf("failed to delete device request: %v", err)
 			}
@@ -99,7 +99,7 @@ func (c *conn) GarbageCollect(now time.Time) (result storage.GCResult, err error
 
 	for _, deviceToken := range deviceTokens {
 		if now.After(deviceToken.Expiry) {
-			if err := c.deleteKey(ctx, keyID(deviceTokenPrefix, deviceToken.DeviceCode)); err != nil {
+			if err := c.deleteKey(ctx, keyID(deviceTokenPrefix, deviceToken.DeviceCode)); err != nil && err != storage.ErrNotFound {
 				c.logger.Error("failed to delete device token", "err", err)
 				delErr = fmt.Errorf("failed to delete device token: %v", err)
 			}
@@ -524,6 +524,12 @@ func (c *conn) txnUpdate(ctx context.Context, key string, update func(current []
 	if err != nil {
 		return err
 	}
+
+	// Avoid updating non-existing key.
+	if len(getResp.Kvs) == 0 {
+		return storage.ErrNotFound
+	}
+
 	var currentValue []byte
 	var modRev int64
 	if len(getResp.Kvs) > 0 {
