@@ -525,11 +525,6 @@ func (c *conn) txnUpdate(ctx context.Context, key string, update func(current []
 		return err
 	}
 
-	// Avoid updating non-existing key.
-	if len(getResp.Kvs) == 0 {
-		return storage.ErrNotFound
-	}
-
 	var currentValue []byte
 	var modRev int64
 	if len(getResp.Kvs) > 0 {
