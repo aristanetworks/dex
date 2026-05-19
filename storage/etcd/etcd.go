@@ -146,7 +146,7 @@ func (c *conn) GetAuthRequest(id string) (a storage.AuthRequest, err error) {
 func (c *conn) UpdateAuthRequest(id string, updater func(a storage.AuthRequest) (storage.AuthRequest, error)) error {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultStorageTimeout)
 	defer cancel()
-	return c.txnUpdate(ctx, keyID(authRequestPrefix, id), func(currentValue []byte) ([]byte, error) {
+	return c.txnUpdate(ctx, keyID(authRequestPrefix, id), false, func(currentValue []byte) ([]byte, error) {
 		var current AuthRequest
 		if len(currentValue) > 0 {
 			if err := json.Unmarshal(currentValue, &current); err != nil {
@@ -205,7 +205,7 @@ func (c *conn) GetRefresh(id string) (r storage.RefreshToken, err error) {
 func (c *conn) UpdateRefreshToken(id string, updater func(old storage.RefreshToken) (storage.RefreshToken, error)) error {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultStorageTimeout)
 	defer cancel()
-	return c.txnUpdate(ctx, keyID(refreshTokenPrefix, id), func(currentValue []byte) ([]byte, error) {
+	return c.txnUpdate(ctx, keyID(refreshTokenPrefix, id), false, func(currentValue []byte) ([]byte, error) {
 		var current RefreshToken
 		if len(currentValue) > 0 {
 			if err := json.Unmarshal(currentValue, &current); err != nil {
@@ -257,7 +257,7 @@ func (c *conn) GetClient(id string) (cli storage.Client, err error) {
 func (c *conn) UpdateClient(id string, updater func(old storage.Client) (storage.Client, error)) error {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultStorageTimeout)
 	defer cancel()
-	return c.txnUpdate(ctx, keyID(clientPrefix, id), func(currentValue []byte) ([]byte, error) {
+	return c.txnUpdate(ctx, keyID(clientPrefix, id), false, func(currentValue []byte) ([]byte, error) {
 		var current storage.Client
 		if len(currentValue) > 0 {
 			if err := json.Unmarshal(currentValue, &current); err != nil {
@@ -309,7 +309,7 @@ func (c *conn) GetPassword(email string) (p storage.Password, err error) {
 func (c *conn) UpdatePassword(email string, updater func(p storage.Password) (storage.Password, error)) error {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultStorageTimeout)
 	defer cancel()
-	return c.txnUpdate(ctx, keyEmail(passwordPrefix, email), func(currentValue []byte) ([]byte, error) {
+	return c.txnUpdate(ctx, keyEmail(passwordPrefix, email), false, func(currentValue []byte) ([]byte, error) {
 		var current storage.Password
 		if len(currentValue) > 0 {
 			if err := json.Unmarshal(currentValue, &current); err != nil {
@@ -354,7 +354,7 @@ func (c *conn) CreateOfflineSessions(ctx context.Context, s storage.OfflineSessi
 func (c *conn) UpdateOfflineSessions(userID string, connID string, updater func(s storage.OfflineSessions) (storage.OfflineSessions, error)) error {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultStorageTimeout)
 	defer cancel()
-	return c.txnUpdate(ctx, keySession(userID, connID), func(currentValue []byte) ([]byte, error) {
+	return c.txnUpdate(ctx, keySession(userID, connID), false, func(currentValue []byte) ([]byte, error) {
 		var current OfflineSessions
 		if len(currentValue) > 0 {
 			if err := json.Unmarshal(currentValue, &current); err != nil {
@@ -399,7 +399,7 @@ func (c *conn) GetConnector(id string) (conn storage.Connector, err error) {
 func (c *conn) UpdateConnector(id string, updater func(s storage.Connector) (storage.Connector, error)) error {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultStorageTimeout)
 	defer cancel()
-	return c.txnUpdate(ctx, keyID(connectorPrefix, id), func(currentValue []byte) ([]byte, error) {
+	return c.txnUpdate(ctx, keyID(connectorPrefix, id), false, func(currentValue []byte) ([]byte, error) {
 		var current storage.Connector
 		if len(currentValue) > 0 {
 			if err := json.Unmarshal(currentValue, &current); err != nil {
@@ -453,7 +453,7 @@ func (c *conn) GetKeys() (keys storage.Keys, err error) {
 func (c *conn) UpdateKeys(updater func(old storage.Keys) (storage.Keys, error)) error {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultStorageTimeout)
 	defer cancel()
-	return c.txnUpdate(ctx, keysName, func(currentValue []byte) ([]byte, error) {
+	return c.txnUpdate(ctx, keysName, true, func(currentValue []byte) ([]byte, error) {
 		var current storage.Keys
 		if len(currentValue) > 0 {
 			if err := json.Unmarshal(currentValue, &current); err != nil {
@@ -539,11 +539,20 @@ func (c *conn) txnCreate(ctx context.Context, key string, value interface{}) err
 	return nil
 }
 
-func (c *conn) txnUpdate(ctx context.Context, key string, update func(current []byte) ([]byte, error)) error {
+func (c *conn) txnUpdate(ctx context.Context, key string, allowCreate bool, update func(current []byte) ([]byte, error)) error {
 	getResp, err := c.db.Get(ctx, key)
 	if err != nil {
 		return err
 	}
+
+	// Avoid updating non-existing key except for signing key creation.
+	// There is no dedicated method to create key. New keys get create using update.
+	if len(getResp.Kvs) == 0 {
+		if !allowCreate {
+			return storage.ErrNotFound
+		}
+	}
+
 	var currentValue []byte
 	var modRev int64
 	if len(getResp.Kvs) > 0 {
@@ -637,7 +646,7 @@ func (c *conn) listDeviceTokens(ctx context.Context) (deviceTokens []DeviceToken
 func (c *conn) UpdateDeviceToken(deviceCode string, updater func(old storage.DeviceToken) (storage.DeviceToken, error)) error {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultStorageTimeout)
 	defer cancel()
-	return c.txnUpdate(ctx, keyID(deviceTokenPrefix, deviceCode), func(currentValue []byte) ([]byte, error) {
+	return c.txnUpdate(ctx, keyID(deviceTokenPrefix, deviceCode), false, func(currentValue []byte) ([]byte, error) {
 		var current DeviceToken
 		if len(currentValue) > 0 {
 			if err := json.Unmarshal(currentValue, &current); err != nil {
