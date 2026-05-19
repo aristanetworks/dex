@@ -51,9 +51,14 @@ func (c *conn) GarbageCollect(now time.Time) (result storage.GCResult, err error
 	var delErr error
 	for _, authRequest := range authRequests {
 		if now.After(authRequest.Expiry) {
-			if err := c.deleteKey(ctx, keyID(authRequestPrefix, authRequest.ID)); err != nil && err != storage.ErrNotFound {
-				c.logger.Error("failed to delete auth request", "err", err)
-				delErr = fmt.Errorf("failed to delete auth request: %v", err)
+			if err := c.deleteKey(ctx, keyID(authRequestPrefix, authRequest.ID)); err != nil {
+				if err == storage.ErrNotFound {
+					// auth req deleted by another dex pod, ignore the error and continue with the next one.
+					c.logger.Info("Ignoring auth request deleted by another instance", "err", err)
+				} else {
+					c.logger.Error("failed to delete auth request", "err", err)
+					delErr = fmt.Errorf("failed to delete auth request: %v", err)
+				}
 			}
 			result.AuthRequests++
 		}
@@ -69,9 +74,14 @@ func (c *conn) GarbageCollect(now time.Time) (result storage.GCResult, err error
 
 	for _, authCode := range authCodes {
 		if now.After(authCode.Expiry) {
-			if err := c.deleteKey(ctx, keyID(authCodePrefix, authCode.ID)); err != nil && err != storage.ErrNotFound {
-				c.logger.Error("failed to delete auth code", "err", err)
-				delErr = fmt.Errorf("failed to delete auth code: %v", err)
+			if err := c.deleteKey(ctx, keyID(authCodePrefix, authCode.ID)); err != nil {
+				if err == storage.ErrNotFound {
+					// auth code deleted by another dex pod, ignore the error and continue with the next one.
+					c.logger.Info("Ignoring auth code deleted by another instance", "err", err)
+				} else {
+					c.logger.Error("failed to delete auth code", "err", err)
+					delErr = fmt.Errorf("failed to delete auth code: %v", err)
+				}
 			}
 			result.AuthCodes++
 		}
@@ -84,9 +94,14 @@ func (c *conn) GarbageCollect(now time.Time) (result storage.GCResult, err error
 
 	for _, deviceRequest := range deviceRequests {
 		if now.After(deviceRequest.Expiry) {
-			if err := c.deleteKey(ctx, keyID(deviceRequestPrefix, deviceRequest.UserCode)); err != nil && err != storage.ErrNotFound {
-				c.logger.Error("failed to delete device request", "err", err)
-				delErr = fmt.Errorf("failed to delete device request: %v", err)
+			if err := c.deleteKey(ctx, keyID(deviceRequestPrefix, deviceRequest.UserCode)); err != nil {
+				if err == storage.ErrNotFound {
+					// device request deleted by another dex pod, ignore the error and continue with the next one.
+					c.logger.Info("Ignoring device request deleted by another instance", "err", err)
+				} else {
+					c.logger.Error("failed to delete device request", "err", err)
+					delErr = fmt.Errorf("failed to delete device request: %v", err)
+				}
 			}
 			result.DeviceRequests++
 		}
@@ -99,9 +114,14 @@ func (c *conn) GarbageCollect(now time.Time) (result storage.GCResult, err error
 
 	for _, deviceToken := range deviceTokens {
 		if now.After(deviceToken.Expiry) {
-			if err := c.deleteKey(ctx, keyID(deviceTokenPrefix, deviceToken.DeviceCode)); err != nil && err != storage.ErrNotFound {
-				c.logger.Error("failed to delete device token", "err", err)
-				delErr = fmt.Errorf("failed to delete device token: %v", err)
+			if err := c.deleteKey(ctx, keyID(deviceTokenPrefix, deviceToken.DeviceCode)); err != nil {
+				if err == storage.ErrNotFound {
+					// device token deleted by another dex pod, ignore the error and continue with the next one.
+					c.logger.Info("Ignoring device token deleted by another instance", "err", err)
+				} else {
+					c.logger.Error("failed to delete device token", "err", err)
+					delErr = fmt.Errorf("failed to delete device token: %v", err)
+				}
 			}
 			result.DeviceTokens++
 		}
@@ -524,7 +544,6 @@ func (c *conn) txnUpdate(ctx context.Context, key string, update func(current []
 	if err != nil {
 		return err
 	}
-
 	var currentValue []byte
 	var modRev int64
 	if len(getResp.Kvs) > 0 {
