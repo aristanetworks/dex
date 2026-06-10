@@ -21,10 +21,18 @@
   </form>
 </div>
 
-{{ if and .UserCode (not .Invalid) }}
 <script>
-  document.querySelector("form[method=''post'']")?.submit();
+  const form = document.querySelector("form[method=''post'']");
+
+  form.addEventListener("submit", function() {
+    const submitButton = document.getElementById("submit-login");
+    submitButton.disabled = true;
+    submitButton.innerText = "Submitting...";
+  });
+
+  {{ if and .UserCode (not .Invalid) }}
+  form.requestSubmit();
+  {{ end }}
 </script>
-{{ end }}
 
 {{ template "footer.html" . }}
