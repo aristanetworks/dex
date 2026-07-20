@@ -25,6 +25,7 @@ import (
 	gosundheithttp "github.com/AppsFlyer/go-sundheit/http"
 	"github.com/fsnotify/fsnotify"
 	"github.com/ghodss/yaml"
+	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	grpcprometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/oklog/run"
 	"github.com/prometheus/client_golang/prometheus"
@@ -206,9 +207,18 @@ func runServe(options serveOptions) error {
 
 		if c.GRPC.TLSClientCA != "" {
 			// Only add metrics if client auth is enabled
+			loggingOpts := []logging.Option{
+				logging.WithLogOnEvents(logging.StartCall, logging.FinishCall),
+			}
 			grpcOptions = append(grpcOptions,
-				grpc.StreamInterceptor(grpcMetrics.StreamServerInterceptor()),
-				grpc.UnaryInterceptor(grpcMetrics.UnaryServerInterceptor()),
+				grpc.ChainStreamInterceptor(
+					grpcMetrics.StreamServerInterceptor(),
+					logging.StreamServerInterceptor(InterceptorLogger(logger), loggingOpts...),
+				),
+				grpc.ChainUnaryInterceptor(
+					grpcMetrics.UnaryServerInterceptor(),
+					logging.UnaryServerInterceptor(InterceptorLogger(logger), loggingOpts...),
+				),
 			)
 		}
 
@@ -399,23 +409,6 @@ func runServe(options serveOptions) error {
 		DefaultMFAChain:            c.MFA.DefaultMFAChain,
 		DefaultConnectorByClientID: defaultConnectorByClientID,
 	}
-	if c.Expiry.SigningKeys != "" {
-		signingKeys, err := time.ParseDuration(c.Expiry.SigningKeys)
-		if err != nil {
-			return fmt.Errorf("invalid config value %q for signing keys expiry: %v", c.Expiry.SigningKeys, err)
-		}
-		logger.Info("config signing keys", "expire_after", signingKeys)
-		serverConfig.RotateKeysAfter = signingKeys
-	}
-	if c.Expiry.IDTokens != "" {
-		idTokens, err := time.ParseDuration(c.Expiry.IDTokens)
-		if err != nil {
-			return fmt.Errorf("invalid config value %q for id token expiry: %v", c.Expiry.IDTokens, err)
-		}
-		logger.Info("config id tokens", "valid_for", idTokens)
-		serverConfig.IDTokensValidFor = idTokens
-	}
-
 	if c.Expiry.AuthRequests != "" {
 		authRequests, err := time.ParseDuration(c.Expiry.AuthRequests)
 		if err != nil {
@@ -904,4 +897,11 @@ func loadDefaultConnectors(filePath string) (map[string]string, error) {
 	var defaultConnectorByClientID map[string]string
 	err = yaml.Unmarshal(fileData, &defaultConnectorByClientID)
 	return defaultConnectorByClientID, err
+}
+
+// InterceptorLogger adapts slog logger to interceptor logger.
+func InterceptorLogger(l *slog.Logger) logging.Logger {
+	return logging.LoggerFunc(func(ctx context.Context, lvl logging.Level, msg string, fields ...any) {
+		l.Log(ctx, slog.Level(lvl), msg, fields...)
+	})
 }
