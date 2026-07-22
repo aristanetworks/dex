@@ -335,7 +335,7 @@ func (c *googleConnector) getGroups(email string, fetchTransitiveGroupMembership
 		}
 
 		for _, group := range groupsList.Groups {
-			if c.groupsFilter == nil || c.groupsFilter.MatchString(group.Email) {
+			if c.groupsFilter != nil && !c.groupsFilter.MatchString(group.Email) {
 				continue
 			}
 

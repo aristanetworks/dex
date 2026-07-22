@@ -241,6 +241,64 @@ func TestGetGroups(t *testing.T) {
 	}
 }
 
+func TestGetGroupsWithFilter(t *testing.T) {
+	ts := testSetup()
+	defer ts.Close()
+
+	serviceAccountFilePath, err := tempServiceAccountKey()
+	assert.Nil(t, err)
+
+	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", serviceAccountFilePath)
+
+	type testCase struct {
+		groupsFilter   string
+		userKey        string
+		expectedGroups []string
+	}
+
+	for name, tc := range map[string]testCase{
+		"filter_matching_subset": {
+			groupsFilter:   "groups_1@",
+			userKey:        "user_1@dexidp.com",
+			expectedGroups: []string{"groups_1@dexidp.com"},
+		},
+		"filter_matching_all": {
+			groupsFilter:   "groups_[12]@",
+			userKey:        "user_1@dexidp.com",
+			expectedGroups: []string{"groups_1@dexidp.com", "groups_2@dexidp.com"},
+		},
+		"filter_matching_none": {
+			groupsFilter:   "nonexistent",
+			userKey:        "user_1@dexidp.com",
+			expectedGroups: nil,
+		},
+	} {
+		tc := tc
+		callCounter = map[string]int{}
+		t.Run(name, func(t *testing.T) {
+			assert := assert.New(t)
+
+			conn, err := newConnector(&Config{
+				ClientID:           "testClient",
+				ClientSecret:       "testSecret",
+				RedirectURI:        ts.URL + "/callback",
+				Scopes:             []string{"openid", "groups"},
+				DomainToAdminEmail: map[string]string{"*": "admin@dexidp.com"},
+				GroupsFilter:       tc.groupsFilter,
+			})
+			assert.Nil(err)
+
+			conn.adminSrv[wildcardDomainToAdminEmail], err = admin.NewService(context.Background(), option.WithoutAuthentication(), option.WithEndpoint(ts.URL))
+			assert.Nil(err)
+
+			lookup := make(map[string]struct{})
+			groups, err := conn.getGroups(tc.userKey, false, lookup)
+			assert.Nil(err)
+			assert.ElementsMatch(tc.expectedGroups, groups)
+		})
+	}
+}
+
 func TestDomainToAdminEmailConfig(t *testing.T) {
 	ts := testSetup()
 	defer ts.Close()

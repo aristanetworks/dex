@@ -345,6 +345,69 @@ func TestHandleAuthorizationWithoutAllowedConnectors(t *testing.T) {
 	require.Equal(t, http.StatusOK, rr.Code)
 }
 
+func TestHandleAuthorizationDefaultConnectorByClientID(t *testing.T) {
+	ctx := t.Context()
+
+	t.Run("client with default connector redirects to it", func(t *testing.T) {
+		httpServer, s := newTestServerMultipleConnectors(t, func(c *Config) {
+			c.DefaultConnectorByClientID = map[string]string{"test-client": "mock"}
+		})
+		defer httpServer.Close()
+
+		require.NoError(t, s.storage.CreateClient(ctx, storage.Client{
+			ID:           "test-client",
+			RedirectURIs: []string{"https://example.com/callback"},
+		}))
+
+		rr := httptest.NewRecorder()
+		req := httptest.NewRequest("GET", fmt.Sprintf("/auth?client_id=test-client&redirect_uri=%s&response_type=code&scope=openid",
+			url.QueryEscape("https://example.com/callback")), nil)
+		s.ServeHTTP(rr, req)
+
+		require.Equal(t, http.StatusFound, rr.Code)
+		require.Contains(t, rr.Header().Get("Location"), "/auth/mock")
+	})
+
+	t.Run("client without default shows connector selection", func(t *testing.T) {
+		httpServer, s := newTestServerMultipleConnectors(t, func(c *Config) {
+			c.DefaultConnectorByClientID = map[string]string{"other-client": "mock"}
+		})
+		defer httpServer.Close()
+
+		require.NoError(t, s.storage.CreateClient(ctx, storage.Client{
+			ID:           "test-client",
+			RedirectURIs: []string{"https://example.com/callback"},
+		}))
+
+		rr := httptest.NewRecorder()
+		req := httptest.NewRequest("GET", fmt.Sprintf("/auth?client_id=test-client&redirect_uri=%s&response_type=code&scope=openid",
+			url.QueryEscape("https://example.com/callback")), nil)
+		s.ServeHTTP(rr, req)
+
+		require.Equal(t, http.StatusOK, rr.Code)
+	})
+
+	t.Run("explicit connector_id overrides default", func(t *testing.T) {
+		httpServer, s := newTestServerMultipleConnectors(t, func(c *Config) {
+			c.DefaultConnectorByClientID = map[string]string{"test-client": "mock"}
+		})
+		defer httpServer.Close()
+
+		require.NoError(t, s.storage.CreateClient(ctx, storage.Client{
+			ID:           "test-client",
+			RedirectURIs: []string{"https://example.com/callback"},
+		}))
+
+		rr := httptest.NewRecorder()
+		req := httptest.NewRequest("GET", fmt.Sprintf("/auth?client_id=test-client&connector_id=mock2&redirect_uri=%s&response_type=code&scope=openid",
+			url.QueryEscape("https://example.com/callback")), nil)
+		s.ServeHTTP(rr, req)
+
+		require.Equal(t, http.StatusFound, rr.Code)
+		require.Contains(t, rr.Header().Get("Location"), "/auth/mock2")
+	})
+}
+
 func TestBackLinkIncludesPromptSelectAccount(t *testing.T) {
 	ctx := t.Context()
 
