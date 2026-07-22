@@ -52,7 +52,7 @@ func (g *clientCredentials) Authorize(ctx context.Context, req *Request, client 
 	claims := storage.Claims{
 		UserID:            client.ID,
 		Username:          client.Name,
-		PreferredUsername:  client.Name,
+		PreferredUsername: client.Name,
 	}
 	for _, scope := range req.Scopes {
 		switch scope {
@@ -64,9 +64,9 @@ func (g *clientCredentials) Authorize(ctx context.Context, req *Request, client 
 	}
 
 	auth := tokens.Authorization{
-		Client: client,
-		Claims: claims,
-		Scopes: req.Scopes,
+		Client:      client,
+		Claims:      claims,
+		Scopes:      req.Scopes,
 		ConnectorID: "client",
 		Nonce:       req.Nonce,
 	}

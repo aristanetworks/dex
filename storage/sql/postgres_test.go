@@ -41,7 +41,7 @@ func TestPostgresTunables(t *testing.T) {
 
 	t.Run("with nothing set, uses defaults", func(t *testing.T) {
 		cfg := *baseCfg
-		logger := slog.New(slog.NewTextHandler(t.Output(), &slog.HandlerOptions{Level: slog.LevelDebug}))
+		logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))
 		c, err := cfg.open(logger)
 		if err != nil {
 			t.Fatalf("error opening connector: %s", err.Error())
@@ -55,7 +55,7 @@ func TestPostgresTunables(t *testing.T) {
 	t.Run("with something set, uses that", func(t *testing.T) {
 		cfg := *baseCfg
 		cfg.MaxOpenConns = 101
-		logger := slog.New(slog.NewTextHandler(t.Output(), &slog.HandlerOptions{Level: slog.LevelDebug}))
+		logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))
 		c, err := cfg.open(logger)
 		if err != nil {
 			t.Fatalf("error opening connector: %s", err.Error())
