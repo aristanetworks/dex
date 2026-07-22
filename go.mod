@@ -21,6 +21,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/handlers v1.5.2
 	github.com/gorilla/mux v1.8.1
+	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.3
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/jcmturner/goidentity/v6 v6.0.1
 	github.com/jcmturner/gokrb5/v8 v8.4.4
@@ -88,7 +89,6 @@ require (
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.17 // indirect
 	github.com/googleapis/gax-go/v2 v2.22.0 // indirect
-	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.3 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.3 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
